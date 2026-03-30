@@ -1,7 +1,11 @@
 """
-Asset Validator Tool - Validates Unreal Engine asset naming conventions.
+Asset Validator Tool - Validates Unreal Engine assets for naming and dimension compliance.
 
-Detects missing prefixes (SM_, T_, M_, etc.) and reports issues to a UI widget.
+Validators:
+- Naming conventions: Detects missing prefixes (SM_, T_, M_, DA_, BP_, MI_)
+- Texture dimensions: Checks that textures do not exceed 4096x4096 resolution
+
+Results are reported to the calling UI widget.
 """
 
 import unreal
