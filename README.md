@@ -17,6 +17,12 @@ Designed to enforce naming conventions and detect common pipeline issues directl
 
 ---
 
+## Preview
+
+![Asset Validator Widget](Screenshots/AssetValidator.png)
+
+---
+
 ## Architecture
 - **UI Layer:** Editor Utility Widget (Blueprint)
 - **Logic Layer:** Python (Unreal Python API)
