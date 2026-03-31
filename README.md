@@ -12,6 +12,7 @@ Designed to enforce naming conventions and detect common pipeline issues directl
 ## Features (Current)
 - **Naming Convention Validation** — Detects missing asset prefixes (`SM_`, `T_`, `M_`, `DA_`, `BP_`, `MI_`)
 - **Texture Dimension Validation** — Checks that textures do not exceed 4096x4096 resolution
+- **Collision Validation** — Ensures Static Meshes have collision data defined
 - **Asset Registry Scanning** — Fast, non-destructive scanning using Unreal's AssetRegistry API
 - **One-click Validation** — Integrated Editor Utility Widget for easy access
 

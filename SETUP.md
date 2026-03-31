@@ -51,6 +51,11 @@ The widget calls `asset_validator.validate_project_assets()` and displays result
 - Maximum: **4096x4096 pixels**
 - Issues reported if either dimension exceeds this limit
 
+### Collision (Static Meshes)
+- All Static Meshes must have collision data defined
+- Supported collision types: Box, Sphere, Capsule (Sphyl), Convex, Tapered Capsule
+- Issues reported if no collision shapes are found
+
 ---
 
 ## Extending the Tool
