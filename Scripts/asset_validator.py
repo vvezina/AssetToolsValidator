@@ -1,9 +1,10 @@
 """
-Asset Validator Tool - Validates Unreal Engine assets for naming and dimension compliance.
+Asset Validator Tool - Validates Unreal Engine assets for naming, dimensions, and collision compliance.
 
 Validators:
 - Naming conventions: Detects missing prefixes (SM_, T_, M_, DA_, BP_, MI_)
 - Texture dimensions: Checks that textures do not exceed 4096x4096 resolution
+- Collision: Ensures Static Meshes have collision data defined
 
 Results are reported to the calling UI widget.
 """
@@ -57,6 +58,38 @@ class AssetValidator:
 
         return issues
 
+    def validate_collision(self, asset_data):
+        """Validate that a Static Mesh has simple collision data."""
+        issues = []
+
+        # Load the Static Mesh asset
+        mesh_asset = asset_data.get_asset()
+        if mesh_asset is None:
+            issues.append("Could not load Static Mesh asset to validate collision.")
+            return issues
+
+        # Get the BodySetup (contains collision data)
+        body_setup = mesh_asset.get_editor_property("body_setup")
+        if body_setup is None:
+            issues.append("Static Mesh has no BodySetup, so no collision data was found.")
+            return issues
+
+        # Get the aggregate geometry (contains all collision shapes)
+        agg_geom = body_setup.get_editor_property("agg_geom")
+
+        # Count all simple collision shapes (boxes, spheres, capsules, convex, tapered capsules)
+        simple_collision_count = 0
+        simple_collision_count += len(agg_geom.get_editor_property("box_elems"))
+        simple_collision_count += len(agg_geom.get_editor_property("sphere_elems"))
+        simple_collision_count += len(agg_geom.get_editor_property("sphyl_elems"))
+        simple_collision_count += len(agg_geom.get_editor_property("convex_elems"))
+        simple_collision_count += len(agg_geom.get_editor_property("tapered_capsule_elems"))
+
+        # Issue if no collision shapes exist
+        if simple_collision_count == 0:
+            issues.append("Static Mesh has no collision defined.")
+
+        return issues
 
 class AssetRegistryScanner:
     """Query the asset registry and collect validation results."""
@@ -77,6 +110,10 @@ class AssetRegistryScanner:
         "MaterialInstanceConstant",
         "Blueprint",
         "DataAsset",
+    }
+
+    COLLISION_CHECK_CLASSES = {
+        "StaticMesh"
     }
 
     def __init__(self):
@@ -107,6 +144,10 @@ class AssetRegistryScanner:
             # Check texture dimensions
             if asset_class == "Texture2D":
                 all_issues.extend(self.asset_validator.validate_texture_dimensions(asset_data))
+
+            # Check collision for Static Meshes
+            if asset_class in self.COLLISION_CHECK_CLASSES:
+                all_issues.extend(self.asset_validator.validate_collision(asset_data))  
 
             # Collect results
             if all_issues:
