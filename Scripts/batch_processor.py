@@ -11,7 +11,6 @@ Handles bulk operations on assets:
 """
 import unreal
 import json
-import re
 
 class BatchProcessor:
 
@@ -21,9 +20,12 @@ class BatchProcessor:
     def process(self, validation_results):
         for issues in validation_results["issues"]:
 
-            if issues["issue_type"] == "naming":
+            if issues["issue_type"] == "naming_prefix":
                 self._process_naming_issue(issues)
-                
+
+            elif issues["issue_type"] == "naming_suffix":
+                self._process_naming_issue(issues)
+
             elif issues["issue_type"] == "texture_dimensions":
                 self._process_texture_issue(issues)
 
@@ -33,40 +35,22 @@ class BatchProcessor:
         return
     
     def _process_naming_issue(self, issue):
-        asset_path = issue["asset_path"].split("/")[:-1]
-        base_path = "/".join(asset_path)
-        asset_name = issue["asset_name"]
-
-        cleaned_name = re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', asset_name).strip('_')
+        base_path = "/".join(issue["asset_path"].split("/")[:-1])
+        base_name = issue["base_name"]
         prefix = issue["expected_prefix"]
-        suffix = cleaned_name.rsplit('_', 1)[-1] 
-        if suffix.isalpha() and suffix.isupper():
-            pass
+        variant_suffix = issue["variant_suffix"]
+
+        # If the asset already has a valid variant suffix, keep it
+        if variant_suffix:
+            suggested_name = f"{base_path}/{prefix}{base_name}_{variant_suffix}"
         else:
-            suggested_name = prefix + cleaned_name + '_' + "A"
-            suggested_name = self._get_available_name(base_path, prefix, cleaned_name)
+            suggested_name = _get_available_name(base_path, prefix, base_name)
 
         print(suggested_name)
-            
-            
 
-
-        # suggested_name = issue["suggested_name"]
-        # # Unreal API call to rename asset
-        # unreal.EditorAssetLibrary.rename_asset(asset_path, suggested_name)
-        # return
-
-    def _get_available_name(self, base_path, prefix, name):
-        """Find next available name by incrementing suffix letter."""
-        suffix = ord('A')
-        while True:
-            new_name = f"{prefix}{name}_{chr(suffix)}"
-            full_path = f"{base_path}/{new_name}"
-            if not unreal.EditorAssetLibrary.does_asset_exist(full_path):
-                return full_path
-            suffix += 1
-
-
+        # Unreal API call to rename asset
+        unreal.EditorAssetLibrary.rename_asset(issue["asset_path"], suggested_name)
+        return
 
     def _process_texture_issue(self, issue):
         pass
@@ -97,7 +81,12 @@ def process_project_assets(results_json, log_window_widget=None):
 # Helper Functions
 # ============================================================================
 
-# def _build_log_window_text(results):
-#     currentLogText = log_window_widget.get_text()  # Get existing text to append to
-#     currentLogText.append(results)  # Append summary
-#     return
+def _get_available_name(base_path, prefix, base_name):
+    """Find next available name by incrementing suffix letter."""
+    suffix = ord('A')
+    while True:
+        new_name = f"{prefix}{base_name}_{chr(suffix)}"
+        full_path = f"{base_path}/{new_name}"
+        if not unreal.EditorAssetLibrary.does_asset_exist(full_path):
+            return full_path
+        suffix += 1

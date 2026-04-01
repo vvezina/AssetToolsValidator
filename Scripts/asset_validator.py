@@ -2,7 +2,7 @@
 Asset Validator Tool - Validates Unreal Engine assets for naming, dimensions, and collision compliance.
 
 Validators:
-- Naming conventions: Detects missing prefixes (SM_, T_, M_, DA_, BP_, MI_)
+- Naming conventions: Detects missing prefixes (SM_, T_, M_, DA_, BP_, MI_) and invalid numeric suffixes
 - Texture dimensions: Checks that textures do not exceed 4096x4096 resolution
 - Collision: Ensures Static Meshes have collision data defined
 
@@ -11,7 +11,7 @@ Results are reported to the calling UI widget.
 
 import unreal
 import json
-
+import re
 
 class AssetValidator:
     """Validates individual assets for naming, dimensions, and collision."""
@@ -40,11 +40,24 @@ class AssetValidator:
             if _is_data_asset(asset_data):
                 required_prefix = "DA_"
 
+        parsed = _parse_asset_name(asset_name, required_prefix)
+
         if required_prefix and not asset_name.startswith(required_prefix):
             issues.append({
-                "type": "naming",
+                "type": "naming_prefix",
                 "message": f"Invalid name '{asset_name}'. Expected prefix '{required_prefix}'.",
-                "expected_prefix": required_prefix
+                "expected_prefix": required_prefix,
+                "base_name": parsed["base_name"],
+                "variant_suffix": parsed["variant_suffix"]
+            })
+
+        if asset_name.split("_")[-1].isdigit():
+            issues.append({
+                "type": "naming_suffix",
+                "message": f"Asset name '{asset_name}' should not end with a numeric suffix (e.g. '_01').",
+                "expected_prefix": required_prefix,
+                "base_name": parsed["base_name"],
+                "variant_suffix": parsed["variant_suffix"]
             })
 
         return issues
@@ -150,11 +163,15 @@ class AssetRegistryScanner:
         for asset_data in all_assets:
             asset_class = _get_asset_class(asset_data)
 
-            # Skip asset classes we don't care about, but check if unknown
-            # classes might be DataAsset subclasses before discarding
+            # Resolve DataAssets: they can appear as unknown classes (e.g. DA_TestData_C)
+            # or as "Blueprint" in the registry. Reclassify them as "DataAsset".
             if asset_class not in self.RELEVANT_CLASSES:
-                if not _is_data_asset(asset_data):
+                if _is_data_asset(asset_data):
+                    asset_class = "DataAsset"
+                else:
                     continue
+            elif asset_class == "Blueprint" and _is_data_asset(asset_data):
+                asset_class = "DataAsset"
 
             total_count += 1
 
@@ -184,6 +201,10 @@ class AssetRegistryScanner:
                     }
                     if "expected_prefix" in issue:
                         entry["expected_prefix"] = issue["expected_prefix"]
+                    if "base_name" in issue:
+                        entry["base_name"] = issue["base_name"]
+                    if "variant_suffix" in issue:
+                        entry["variant_suffix"] = issue["variant_suffix"]
                     issues.append(entry)
             else:
                 valid_count += 1
@@ -267,3 +288,22 @@ def _build_log_window_text(results):
             )
 
     return "\n".join(lines)
+
+
+def _parse_asset_name(name, expected_prefix):
+    """Parse asset name into base name and variant suffix."""
+    # Remove expected prefix if it exists
+    if expected_prefix and name.startswith(expected_prefix):
+        name = name[len(expected_prefix):]
+
+    # Remove non-alphanumeric characters from start and end, but keep underscores
+    cleaned_name = re.sub(r'^[^a-zA-Z]+|[^a-zA-Z]+$', '', name).strip('_')
+
+    # Check for trailing variant suffix (e.g. _A, _AB, _ABC — up to 3 letters)
+    variant_suffix = None
+    parts = cleaned_name.rsplit('_', 1)
+    if len(parts) > 1 and parts[-1].isalpha() and parts[-1].isupper() and len(parts[-1]) <= 3:
+        cleaned_name = parts[0]
+        variant_suffix = parts[-1]
+
+    return {"base_name": cleaned_name, "variant_suffix": variant_suffix}
