@@ -58,15 +58,29 @@ class BatchProcessor:
         # Rename the asset and track whether it succeeded
         success = unreal.EditorAssetLibrary.rename_asset(issue["asset_path"], suggested_name)
 
-        result["action"] = "renamed"
+        new_name = suggested_name.split("/")[-1]
         result["success"] = success
-        result["old_path"] = issue["asset_path"]
-        result["new_path"] = suggested_name
+        result["log"] = f"[Renamed] {issue['asset_path']} -> {new_name}"
 
         return result
 
     def _process_texture_issue(self, issue):
-        pass
+        """Cap a texture's max size to 4096 and save the asset."""
+        result = {}
+        loaded_asset = unreal.EditorAssetLibrary.load_asset(issue["asset_path"])
+
+        # set_editor_property returns None, so we use try/except to track success
+        try:
+            loaded_asset.set_editor_property("max_texture_size", 4096)
+            unreal.EditorAssetLibrary.save_asset(issue["asset_path"])
+            success = True
+        except:
+            success = False
+
+        result["success"] = success
+        result["log"] = f"[Resized] {issue['asset_path']} - Set max texture size to 4096x4096"
+
+        return result
 
     def _process_collision_issue(self, issue):
         pass
@@ -136,13 +150,10 @@ def _build_log_window_text(actions):
     if not valid_actions:
         lines.append("No actions taken.")
     else:
-        # Each action shows its status and the old -> new name
         for action in valid_actions:
-            new_name = action['new_path'].split("/")[-1]
-            status = "FAILED" if not action['success'] else action['action'].capitalize()
-            lines.append(
-                f"[{status}] "
-                f"{action['old_path']} -> {new_name}"
-            )
+            if action['success']:
+                lines.append(action['log'])
+            else:
+                lines.append(f"[FAILED] {action['log']}")
 
     return "\n".join(lines)
