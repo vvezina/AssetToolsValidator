@@ -16,25 +16,31 @@ class BatchProcessor:
 
     def __init__(self):
         pass
-    
+
     def process(self, validation_results):
+        """Route each issue to its handler and collect results."""
+        actions = []
+
         for issues in validation_results["issues"]:
 
             if issues["issue_type"] == "naming_prefix":
-                self._process_naming_issue(issues)
+                actions.append(self._process_naming_issue(issues))
 
             elif issues["issue_type"] == "naming_suffix":
-                self._process_naming_issue(issues)
+                actions.append(self._process_naming_issue(issues))
 
             elif issues["issue_type"] == "texture_dimensions":
-                self._process_texture_issue(issues)
+                actions.append(self._process_texture_issue(issues))
 
             elif issues["issue_type"] == "collision":
-                self._process_collision_issue(issues)
-            # Add more issue types as needed              
-        return
-    
+                actions.append(self._process_collision_issue(issues))
+            # Add more issue types as needed
+
+        return actions
+
     def _process_naming_issue(self, issue):
+        """Rename an asset to match the expected naming convention."""
+        result = {}
         base_path = "/".join(issue["asset_path"].split("/")[:-1])
         base_name = issue["base_name"]
         prefix = issue["expected_prefix"]
@@ -43,22 +49,29 @@ class BatchProcessor:
         # If the asset already has a valid variant suffix, keep it
         if variant_suffix:
             suggested_name = f"{base_path}/{prefix}{base_name}_{variant_suffix}"
+        # Otherwise, find an available name with an incremented suffix
         else:
             suggested_name = _get_available_name(base_path, prefix, base_name)
 
         print(suggested_name)
 
-        # Unreal API call to rename asset
-        unreal.EditorAssetLibrary.rename_asset(issue["asset_path"], suggested_name)
-        return
+        # Rename the asset and track whether it succeeded
+        success = unreal.EditorAssetLibrary.rename_asset(issue["asset_path"], suggested_name)
+
+        result["action"] = "renamed"
+        result["success"] = success
+        result["old_path"] = issue["asset_path"]
+        result["new_path"] = suggested_name
+
+        return result
 
     def _process_texture_issue(self, issue):
         pass
 
     def _process_collision_issue(self, issue):
         pass
-    
-        
+
+
 
 def process_project_assets(results_json, log_window_widget=None):
     """
@@ -72,7 +85,8 @@ def process_project_assets(results_json, log_window_widget=None):
     """
     results = json.loads(results_json)
     processor = BatchProcessor()
-    processor.process(results)
+    actions = processor.process(results)
+    _update_log_window(log_window_widget, actions)
     return
 
 
@@ -82,7 +96,7 @@ def process_project_assets(results_json, log_window_widget=None):
 # ============================================================================
 
 def _get_available_name(base_path, prefix, base_name):
-    """Find next available name by incrementing suffix letter."""
+    """Find next available name by incrementing suffix letter (A, B, C...)."""
     suffix = ord('A')
     while True:
         new_name = f"{prefix}{base_name}_{chr(suffix)}"
@@ -90,3 +104,45 @@ def _get_available_name(base_path, prefix, base_name):
         if not unreal.EditorAssetLibrary.does_asset_exist(full_path):
             return full_path
         suffix += 1
+
+
+
+
+def _update_log_window(log_window_widget, actions):
+    """Append batch processing results to the existing log window text."""
+    if log_window_widget is None:
+        return
+
+    existing_log = str(log_window_widget.get_text())
+    log_window_widget.set_text(existing_log + "\n" + _build_log_window_text(actions))
+
+
+def _build_log_window_text(actions):
+    """Format the list of actions into a human-readable log string."""
+    lines = [
+        "",
+        "Batch Processor: complete.",
+    ]
+
+    # Filter out None entries from unimplemented handlers
+    valid_actions = [a for a in actions if a is not None]
+    succeeded = sum(1 for a in valid_actions if a['success'])
+    failed = len(valid_actions) - succeeded
+
+    # Summary line
+    lines.append(f"Actions: {len(valid_actions)} | Succeeded: {succeeded} | Failed: {failed}")
+    lines.append("")
+
+    if not valid_actions:
+        lines.append("No actions taken.")
+    else:
+        # Each action shows its status and the old -> new name
+        for action in valid_actions:
+            new_name = action['new_path'].split("/")[-1]
+            status = "FAILED" if not action['success'] else action['action'].capitalize()
+            lines.append(
+                f"[{status}] "
+                f"{action['old_path']} -> {new_name}"
+            )
+
+    return "\n".join(lines)
