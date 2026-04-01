@@ -9,7 +9,8 @@
 ### 1. Open the Validator Widget
 1. In Unreal Editor, navigate to **Content Browser**
 2. Open `EUW_AssetValidator` (Editor Utility Widget)
-3. Click **"Validate Asset"**
+3. Click **"Validate Asset"** to scan for issues
+4. Click **"Fix Assets"** to automatically rename assets with naming issues
 
 Results display in the widget's text box.
 
@@ -23,17 +24,18 @@ Run the validator to see detected issues.
 
 ### Setup Details
 
-The Python validation logic is located in:
+The Python scripts are located in:
 ```
-Scripts/asset_validator.py
+Scripts/asset_validator.py    — Validation logic
+Scripts/batch_processor.py    — Batch fix/rename logic
 ```
 
 The Blueprint Editor Utility Widget:
 ```
-Content/EUW_AssetValidator.uasset
+Content/Tools/AssetValidator/UI/EUW_AssetValidator.uasset
 ```
 
-The widget calls `asset_validator.validate_project_assets()` and displays results in its text display.
+The widget calls `asset_validator.validate_project_assets()` to scan and `batch_processor.process_project_assets()` to fix issues.
 
 ---
 
@@ -45,7 +47,11 @@ The widget calls `asset_validator.validate_project_assets()` and displays result
 - **Material** → `M_*`
 - **Blueprint** → `BP_*`
 - **Material Instance** → `MI_*`
-- **DataAsset** → `DA_*`
+- **DataAsset** → `DA_*` (including Blueprint-based subclasses)
+
+### Naming Suffixes
+- Numeric suffixes (e.g. `_01`, `_02`) are flagged as invalid
+- Alphabetic variant suffixes (e.g. `_A`, `_B`, `_AB`) are valid and preserved during fixes
 
 ### Texture Dimensions
 - Maximum: **4096x4096 pixels**
