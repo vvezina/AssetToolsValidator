@@ -78,6 +78,11 @@ class AssetValidator:
             })
             return issues
 
+        # Skip if max_texture_size is already capped to 4096 or lower
+        max_size = texture_asset.get_editor_property("max_texture_size")
+        if 0 < max_size <= 4096:
+            return issues
+
         # Check if either dimension exceeds 4096
         width = texture_asset.blueprint_get_size_x()
         height = texture_asset.blueprint_get_size_y()
@@ -154,7 +159,6 @@ class AssetValidator:
             })
 
         return issues
-
 
 class AssetRegistryScanner:
     """Query the asset registry and collect validation results."""

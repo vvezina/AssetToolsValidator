@@ -53,8 +53,11 @@ class BatchProcessor:
         variant_suffix = issue["variant_suffix"]
 
         # If the asset already has a valid variant suffix, keep it
+        # Fall back to finding an available name if it's already taken
         if variant_suffix:
             suggested_name = f"{base_path}/{prefix}{base_name}_{variant_suffix}"
+            if unreal.EditorAssetLibrary.does_asset_exist(suggested_name):
+                suggested_name = _get_available_name(base_path, prefix, base_name)
         # Otherwise, find an available name with an incremented suffix
         else:
             suggested_name = _get_available_name(base_path, prefix, base_name)
@@ -76,6 +79,8 @@ class BatchProcessor:
         # set_editor_property returns None, so we use try/except to track success
         try:
             loaded_asset.set_editor_property("max_texture_size", 4096)
+            # Mark the asset as dirty so the save actually writes the change
+            loaded_asset.modify()
             unreal.EditorAssetLibrary.save_asset(issue["asset_path"])
             success = True
         except:
