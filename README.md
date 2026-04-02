@@ -26,7 +26,7 @@ Designed to enforce naming conventions and detect common pipeline issues directl
 
 ## Preview
 
-<video src="https://raw.githubusercontent.com/vvezina/AssetToolsValidator/main/Screenshots/AssetValidatorGif.mp4" autoplay loop muted playsinline width="100%"></video>
+https://github.com/user-attachments/assets/5a0e76d6-f04b-4dfd-a8cf-95364c4d8ffb
 
 ---
 
