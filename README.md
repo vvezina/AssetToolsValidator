@@ -26,10 +26,8 @@ Designed to enforce naming conventions and detect common pipeline issues directl
 
 ## Preview
 
-![Step 1](Screenshots/AssetValidator_A.png)
-![Step 2](Screenshots/AssetValidator_B.png)
-![Step 3](Screenshots/AssetValidator_C.png)
-![Step 4](Screenshots/AssetValidator_D.png)
+![Issues Detected](Screenshots/AssetValidator_A.png)
+![All Fixed](Screenshots/AssetValidator_D.png)
 
 <details>
 <summary>Animated demo (GIF)</summary>
