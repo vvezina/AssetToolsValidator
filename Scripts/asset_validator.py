@@ -1,10 +1,11 @@
 """
-Asset Validator Tool - Validates Unreal Engine assets for naming, dimensions, and collision compliance.
+Asset Validator Tool - Validates Unreal Engine assets for naming, dimensions, collision, and LOD compliance.
 
 Validators:
 - Naming conventions: Detects missing prefixes (SM_, T_, M_, DA_, BP_, MI_) and invalid numeric suffixes
 - Texture dimensions: Checks that textures do not exceed 4096x4096 resolution
 - Collision: Ensures Static Meshes have collision data defined
+- LOD: Ensures Static Meshes have at least 3 LODs (LOD0, LOD1, LOD2)
 
 Results are reported to the calling UI widget.
 """
@@ -14,7 +15,7 @@ import json
 import re
 
 class AssetValidator:
-    """Validates individual assets for naming, dimensions, and collision."""
+    """Validates individual assets for naming, dimensions, collision, and LODs."""
 
     REQUIRED_PREFIXES = {
         "StaticMesh": "SM_",
@@ -42,22 +43,24 @@ class AssetValidator:
 
         parsed = _parse_asset_name(asset_name, required_prefix)
 
+        # Check if the asset is missing its required prefix
         if required_prefix and not asset_name.startswith(required_prefix):
             issues.append({
-                "type": "naming_prefix",
+                "issue_type": "naming_prefix",
                 "message": f"Invalid name '{asset_name}'. Expected prefix '{required_prefix}'.",
                 "expected_prefix": required_prefix,
                 "base_name": parsed["base_name"],
-                "variant_suffix": parsed["variant_suffix"]
+                "variant_suffix": parsed["variant_suffix"],
             })
 
+        # Check if the asset name ends with a numeric suffix (e.g. _01)
         if asset_name.split("_")[-1].isdigit():
             issues.append({
-                "type": "naming_suffix",
+                "issue_type": "naming_suffix",
                 "message": f"Asset name '{asset_name}' should not end with a numeric suffix (e.g. '_01').",
                 "expected_prefix": required_prefix,
                 "base_name": parsed["base_name"],
-                "variant_suffix": parsed["variant_suffix"]
+                "variant_suffix": parsed["variant_suffix"],
             })
 
         return issues
@@ -66,21 +69,23 @@ class AssetValidator:
         """Validate that textures do not exceed the 4K size limit."""
         issues = []
 
+        # Load the texture asset
         texture_asset = asset_data.get_asset()
         if texture_asset is None:
             issues.append({
-                "type": "texture_dimensions",
-                "message": "Could not load texture asset to validate dimensions."
+                "issue_type": "texture_dimensions",
+                "message": "Could not load texture asset to validate dimensions.",
             })
             return issues
 
+        # Check if either dimension exceeds 4096
         width = texture_asset.blueprint_get_size_x()
         height = texture_asset.blueprint_get_size_y()
 
         if width > 4096 or height > 4096:
             issues.append({
-                "type": "texture_dimensions",
-                "message": f"Texture dimensions exceed 4K: {width}x{height}. Maximum is 4096x4096."
+                "issue_type": "texture_dimensions",
+                "message": f"Texture dimensions exceed 4K: {width}x{height}. Maximum is 4096x4096.",
             })
 
         return issues
@@ -93,8 +98,8 @@ class AssetValidator:
         mesh_asset = asset_data.get_asset()
         if mesh_asset is None:
             issues.append({
-                "type": "collision",
-                "message": "Could not load Static Mesh asset to validate collision."
+                "issue_type": "collision",
+                "message": "Could not load Static Mesh asset to validate collision.",
             })
             return issues
 
@@ -102,8 +107,8 @@ class AssetValidator:
         body_setup = mesh_asset.get_editor_property("body_setup")
         if body_setup is None:
             issues.append({
-                "type": "collision",
-                "message": "Static Mesh has no BodySetup, so no collision data was found."
+                "issue_type": "collision",
+                "message": "Static Mesh has no BodySetup, so no collision data was found.",
             })
             return issues
 
@@ -121,11 +126,35 @@ class AssetValidator:
         # Issue if no collision shapes exist
         if simple_collision_count == 0:
             issues.append({
-                "type": "collision",
-                "message": "Static Mesh has no collision defined."
+                "issue_type": "collision",
+                "message": "Static Mesh has no collision defined.",
             })
 
         return issues
+
+    def validate_lod(self, asset_data):
+        """Validate that a Static Mesh has at least 3 LODs (LOD0, LOD1, LOD2)."""
+        issues = []
+
+        # Load the Static Mesh asset
+        mesh_asset = asset_data.get_asset()
+        if mesh_asset is None:
+            issues.append({
+                "issue_type": "lod",
+                "message": "Could not load Static Mesh asset to validate LODs.",
+            })
+            return issues
+
+        # LOD 0 is the base mesh, so we need at least 3 (LOD0 + LOD1 + LOD2)
+        lod_count = unreal.EditorStaticMeshLibrary.get_lod_count(mesh_asset)
+        if lod_count < 3:
+            issues.append({
+                "issue_type": "lod",
+                "message": f"Static Mesh has {lod_count} LOD(s), expected at least 3 (LOD0, LOD1, LOD2).",
+            })
+
+        return issues
+
 
 class AssetRegistryScanner:
     """Query the asset registry and collect validation results."""
@@ -141,7 +170,8 @@ class AssetRegistryScanner:
         "DataAsset",
     }
 
-    COLLISION_CHECK_CLASSES = {
+    # Asset classes that require collision and LOD validation
+    STATIC_MESH_CLASSES = {
         "StaticMesh"
     }
 
@@ -175,37 +205,32 @@ class AssetRegistryScanner:
 
             total_count += 1
 
+            # Common fields shared by all issues for this asset
+            base_entry = {
+                "asset_name": str(asset_data.asset_name),
+                "asset_path": str(asset_data.package_name),
+                "asset_class": asset_class,
+            }
+
             all_issues = []
 
+            # Check naming conventions (prefixes and suffixes)
             all_issues.extend(self.asset_validator.validate_naming(asset_data))
 
             # Check texture dimensions
             if asset_class == "Texture2D":
                 all_issues.extend(self.asset_validator.validate_texture_dimensions(asset_data))
 
-            # Check collision for Static Meshes
-            if asset_class in self.COLLISION_CHECK_CLASSES:
-                all_issues.extend(self.asset_validator.validate_collision(asset_data))  
+            # Check collision and LODs for Static Meshes
+            if asset_class in self.STATIC_MESH_CLASSES:
+                all_issues.extend(self.asset_validator.validate_collision(asset_data))
+                all_issues.extend(self.asset_validator.validate_lod(asset_data))
 
-            # Collect results — forward any extra fields (e.g. expected_prefix)
-            # from validators so the batch processor can use them
+            # Merge common fields with each issue and add to results
             if all_issues:
                 invalid_count += 1
                 for issue in all_issues:
-                    entry = {
-                        "asset_name": str(asset_data.asset_name),
-                        "asset_path": str(asset_data.package_name),
-                        "asset_class": asset_class,
-                        "message": issue["message"],
-                        "issue_type": issue["type"],
-                    }
-                    if "expected_prefix" in issue:
-                        entry["expected_prefix"] = issue["expected_prefix"]
-                    if "base_name" in issue:
-                        entry["base_name"] = issue["base_name"]
-                    if "variant_suffix" in issue:
-                        entry["variant_suffix"] = issue["variant_suffix"]
-                    issues.append(entry)
+                    issues.append({**base_entry, **issue})
             else:
                 valid_count += 1
 
@@ -220,7 +245,7 @@ class AssetRegistryScanner:
 
 
 
-def validate_project_assets(log_window_widget=None):
+def validate_project_assets(log_window_widget=None, log_scroll_box_widget=None):
     """
     Entry point for the Asset Validator tool.
 
@@ -232,7 +257,7 @@ def validate_project_assets(log_window_widget=None):
     """
     scanner = AssetRegistryScanner()
     results = scanner.scan_assets()
-    _update_log_window(log_window_widget, results)
+    _update_log_window(log_window_widget, log_scroll_box_widget, results)
 
     return json.dumps(results)
 
@@ -257,18 +282,26 @@ def _is_data_asset(asset_data):
     return isinstance(obj, unreal.DataAsset)
 
 
-def _update_log_window(log_window_widget, results):
+def _update_log_window(log_window_widget, log_scroll_box_widget, results):
+    """Append validation results to the existing log window text."""
     if log_window_widget is None:
         return
 
-    log_window_widget.set_text(_build_log_window_text(results))
+    existing_log = str(log_window_widget.get_text())
+    log_window_widget.set_text(existing_log + "\n" + _build_log_window_text(results))
+
+    # Scroll to the bottom so the latest results are visible
+    if log_scroll_box_widget is not None:
+        log_scroll_box_widget.scroll_to_end()
 
 
 def _build_log_window_text(results):
+    """Format the validation results into a human-readable log string."""
     summary = results["summary"]
     issues = results["issues"]
 
     lines = [
+        "",
         "Asset Validator: scan complete.",
         (
             f"Total: {summary['total']} | "
