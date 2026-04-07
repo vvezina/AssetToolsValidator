@@ -1,46 +1,74 @@
 # Asset Tools Validator
 
-Lightweight asset validation and batch processing tool built using Unreal Engine Editor Utility Widgets and Python.
+Asset validation and batch processing tool built in Unreal Engine using Editor Utility Widgets and Python.
 
-Enforces naming conventions and detects common pipeline issues directly inside the editor, then automatically fixes them in one click.
+Designed to detect common pipeline issues and fix them directly inside the editor in one pass.
+
+## Why
+
+I built this tool to focus on Unreal tools development using Python.
+
+The goal was to show the workflow between Python and Editor Utility Widgets, while keeping the tool simple and practical.
+
+It covers a few common checks (naming, textures, etc.) that most projects need, but structured in a way that can be easily extended.
 
 ## Preview
 
-![Issues Detected](Screenshots/AssetValidator_A.png)
+![Issues Detected](Screenshots/AssetValidator_A.png)  
 ![All Fixed](Screenshots/AssetValidator_D.png)
 
 <details>
 <summary>Animated demo (GIF)</summary>
 
 ![Asset Validator Demo](Screenshots/AssetValidatorGif.gif)
+
 </details>
 
-## Features
-- **Naming Convention Validation** — Detects missing asset prefixes (`SM_`, `T_`, `M_`, `DA_`, `BP_`, `MI_`) and invalid numeric suffixes
-- **DataAsset Subclass Detection** — Correctly identifies Blueprint-based DataAsset subclasses in the asset registry
-- **Texture Dimension Validation** — Checks that textures do not exceed 4096x4096 resolution
-- **Collision Validation** — Ensures Static Meshes have simple collision data defined
-- **LOD Validation** — Ensures Static Meshes have at least 3 LODs (LOD0, LOD1, LOD2)
-- **Batch Asset Processor** — Automatically fixes all detected issues:
-  - Renames assets to match naming conventions
-  - Caps oversized textures to 4096x4096
-  - Adds simple box collision from bounding box
-  - Auto-generates LODs with progressive triangle reduction (50%, 25%)
-- **Scrollable Log Output** — Results append to a scrollable log window that auto-scrolls to the latest output
+## What it does
+
+Scans a selected folder and validates assets for common issues:
+
+- Naming conventions (`SM_`, `T_`, `M_`, `DA_`, `BP_`, `MI_`)  
+- Invalid numeric suffixes  
+- Texture size limits (max 4096x4096)  
+- Missing collision on Static Meshes  
+- Missing LODs (requires at least LOD0–LOD2)  
+- Detects Blueprint-based DataAsset subclasses via asset registry  
+
+## Batch Processing
+
+Fixes all detected issues in one pass:
+
+- Renames assets to match conventions  
+- Resizes oversized textures  
+- Generates simple collision from bounding box  
+- Auto-generates LODs (50% / 25%)  
 
 ## Architecture
-- **UI Layer:** Editor Utility Widget (Blueprint)
-- **Validation Layer:** Python — `asset_validator.py` (Unreal Python API)
-- **Processing Layer:** Python — `batch_processor.py` (Unreal Python API)
-- **Flow:** Validate button → scan & report issues → Fix Assets button → batch fix all issues
+
+Editor Utility Widget (UI)  
+→ Python validator (`asset_validator.py`)  
+→ Python batch processor (`batch_processor.py`)  
+
+Flow:  
+Validate → scan & report issues → Fix → apply batch corrections  
+
+## Constraints / Decisions
+
+- Python used for validation and processing to leverage Unreal’s editor scripting API  
+- UI kept in Blueprint (EUW) for fast iteration  
+- Designed to handle large folders (1000+ assets)  
+- Validation and fixing split into separate steps for clarity and control  
+- Built primarily in Python to demonstrate tooling workflows outside of Blueprint/C++  
 
 ## Setup
 
-1. Open the project in Unreal Engine 5.7
-2. Ensure the Python plugin is enabled
-3. Open the Editor Utility Widget to validate and fix assets
+1. Open the project in Unreal Engine 5.7  
+2. Enable the Python plugin  
+3. Open the Editor Utility Widget "EUW_AssetValidator" to validate and fix assets  
 
 ## Tech
-- Unreal Engine 5.7
-- Python (Unreal Python API)
-- Blueprint (Editor Utility Widget)
+
+- Unreal Engine 5.7  
+- Python (Unreal Python API)  
+- Blueprint (Editor Utility Widget)  
